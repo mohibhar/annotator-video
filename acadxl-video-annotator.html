@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Annotator" />
+<title>AcadXL · Video Annotator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Sora:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0c0e12;
+    --panel:#14171d;
+    --panel-2:#1b1f27;
+    --line:#272c36;
+    --ink:#e8ecf2;
+    --ink-dim:#9aa3b2;
+    --orange:#F26522;
+    --blue:#4DB8E8;
+    --green:#5CB85C;
+    --yellow:#FFD23F;
+    --red:#FF5252;
+    --white:#ffffff;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;margin:0;}
+  body{
+    background:
+      radial-gradient(1100px 700px at 85% -10%, rgba(242,101,34,.10), transparent 60%),
+      radial-gradient(900px 600px at 0% 110%, rgba(77,184,232,.10), transparent 60%),
+      var(--bg);
+    color:var(--ink);
+    font-family:'Sora',-apple-system,system-ui,sans-serif;
+    overscroll-behavior:none;
+    -webkit-user-select:none;user-select:none;
+    -webkit-touch-callout:none;
+    overflow:hidden;
+  }
+  .app{display:flex;flex-direction:column;height:100dvh;}
+
+  /* ---- Header ---- */
+  header{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:10px 16px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);
+  }
+  .brand{display:flex;align-items:center;gap:10px;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;letter-spacing:-.02em;font-size:18px;white-space:nowrap;}
+  .brand .dot{width:11px;height:11px;border-radius:3px;background:var(--orange);box-shadow:0 0 0 3px rgba(242,101,34,.18);}
+  .brand small{font-family:'Sora';font-weight:500;color:var(--ink-dim);font-size:12px;letter-spacing:.04em;}
+  .src{display:flex;align-items:center;gap:8px;flex:1;min-width:240px;flex-wrap:wrap;}
+  .url{flex:1;min-width:160px;display:flex;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .url input{flex:1;background:transparent;border:0;color:var(--ink);padding:9px 12px;font-family:'Sora';font-size:13px;outline:none;}
+  .btn{
+    appearance:none;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);
+    font-family:'Sora';font-weight:500;font-size:13px;padding:9px 14px;border-radius:10px;cursor:pointer;
+    display:inline-flex;align-items:center;gap:7px;transition:.15s;white-space:nowrap;min-height:40px;
+  }
+  .btn:active{transform:scale(.97);}
+  .btn.primary{background:var(--orange);border-color:var(--orange);color:#1a0d05;font-weight:600;}
+  .btn.ghost{background:transparent;}
+  .btn svg{width:16px;height:16px;}
+
+  /* ---- Main layout ---- */
+  main{flex:1;display:grid;grid-template-columns:1fr 330px;min-height:0;}
+  .stage-wrap{display:flex;flex-direction:column;min-width:0;min-height:0;padding:14px;gap:12px;}
+  .frame{
+    position:relative;flex:1;min-height:0;align-self:center;width:100%;
+    background:#000;border-radius:var(--radius);overflow:hidden;
+    border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;
+    max-height:100%;
+  }
+  .frame.has-ratio{aspect-ratio:var(--ar,16/9);flex:0 1 auto;height:auto;max-width:100%;}
+  video{width:100%;height:100%;display:block;object-fit:contain;background:#000;}
+  canvas#draw{position:absolute;inset:0;width:100%;height:100%;touch-action:none;pointer-events:none;}
+  .frame.drawing canvas#draw{pointer-events:auto;cursor:crosshair;}
+  .empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--ink-dim);text-align:center;padding:24px;}
+  .empty .big{font-family:'Bricolage Grotesque';font-weight:800;font-size:22px;color:var(--ink);}
+  .empty svg{width:48px;height:48px;opacity:.5;}
+
+  .mode-pill{position:absolute;top:12px;left:12px;display:flex;background:rgba(12,14,18,.72);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:999px;padding:4px;gap:2px;z-index:5;}
+  .mode-pill button{border:0;background:transparent;color:var(--ink-dim);font-family:'Sora';font-weight:600;font-size:12px;padding:7px 14px;border-radius:999px;cursor:pointer;display:flex;align-items:center;gap:6px;}
+  .mode-pill button.on{background:var(--orange);color:#1a0d05;}
+  .mode-pill button svg{width:14px;height:14px;}
+
+  /* ---- Toolbar ---- */
+  .toolbar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;
+  }
+  .toolbar[hidden]{display:none;}
+  .tgroup{display:flex;align-items:center;gap:6px;padding-right:10px;border-right:1px solid var(--line);}
+  .tgroup:last-child{border-right:0;padding-right:0;}
+  .tool{width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:11px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);cursor:pointer;}
+  .tool svg{width:20px;height:20px;}
+  .tool.on{background:rgba(242,101,34,.16);border-color:var(--orange);color:var(--orange);}
+  .tool:active{transform:scale(.94);}
+  .tool[disabled]{opacity:.35;}
+  .swatch{width:30px;height:30px;border-radius:50%;border:2px solid rgba(255,255,255,.25);cursor:pointer;transition:.12s;}
+  .swatch.on{border-color:#fff;transform:scale(1.12);box-shadow:0 0 0 3px rgba(255,255,255,.12);}
+  .width-ctrl{display:flex;align-items:center;gap:8px;}
+  .width-ctrl input[type=range]{width:90px;accent-color:var(--orange);}
+  .toggle{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-dim);cursor:pointer;}
+  .toggle .sw{width:38px;height:22px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line);position:relative;transition:.15s;}
+  .toggle .sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--ink-dim);transition:.15s;}
+  .toggle.on .sw{background:rgba(92,184,92,.3);border-color:var(--green);}
+  .toggle.on .sw::after{left:18px;background:var(--green);}
+
+  /* ---- Right panel ---- */
+  aside{border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0;}
+  .tabs{display:flex;border-bottom:1px solid var(--line);}
+  .tabs button{flex:1;background:transparent;border:0;color:var(--ink-dim);font-family:'Sora';font-weight:600;font-size:13px;padding:13px;cursor:pointer;border-bottom:2px solid transparent;}
+  .tabs button.on{color:var(--ink);border-bottom-color:var(--orange);}
+  .pane{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;}
+  .pane[hidden]{display:none;}
+  .add-note{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+  .add-note .row{display:flex;gap:8px;align-items:center;}
+  .ts-chip{font-family:'Bricolage Grotesque';font-weight:800;background:var(--panel-2);border:1px solid var(--line);color:var(--blue);padding:6px 10px;border-radius:8px;font-size:13px;font-variant-numeric:tabular-nums;}
+  .add-note textarea{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;color:var(--ink);font-family:'Sora';font-size:13px;padding:10px;resize:vertical;min-height:52px;outline:none;}
+  .note{background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:10px 11px;margin-bottom:9px;}
+  .note .head{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .note .time{font-family:'Bricolage Grotesque';font-weight:800;color:var(--blue);font-size:13px;font-variant-numeric:tabular-nums;cursor:pointer;background:none;border:0;padding:0;}
+  .note .time:active{opacity:.6;}
+  .note .acts{margin-left:auto;display:flex;gap:4px;}
+  .note .acts button{background:none;border:0;color:var(--ink-dim);cursor:pointer;padding:4px;border-radius:6px;}
+  .note .acts button svg{width:15px;height:15px;display:block;}
+  .note .body{font-size:13px;line-height:1.5;color:var(--ink);white-space:pre-wrap;word-break:break-word;}
+  .empty-list{color:var(--ink-dim);font-size:13px;text-align:center;padding:30px 10px;line-height:1.6;}
+  .snap-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+  .snap{position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#000;}
+  .snap img{width:100%;display:block;}
+  .snap .x{position:absolute;top:5px;right:5px;background:rgba(0,0,0,.6);border:0;color:#fff;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:14px;}
+  .snap .dl{position:absolute;bottom:5px;right:5px;background:var(--orange);color:#1a0d05;border:0;border-radius:8px;font-size:11px;font-weight:600;font-family:'Sora';padding:5px 8px;cursor:pointer;}
+  .pane-foot{padding:10px 12px;border-top:1px solid var(--line);display:flex;gap:8px;}
+  .pane-foot .btn{flex:1;justify-content:center;font-size:12px;}
+
+  .tip{font-size:11px;color:var(--ink-dim);line-height:1.55;margin-top:14px;padding:10px;background:var(--panel-2);border:1px dashed var(--line);border-radius:10px;}
+  .tip b{color:var(--ink);}
+
+  @media (max-width:820px){
+    main{grid-template-columns:1fr;grid-template-rows:1fr auto;}
+    aside{border-left:0;border-top:1px solid var(--line);max-height:42dvh;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><span class="dot"></span>AcadXL <small>Video Annotator</small></div>
+    <div class="src">
+      <button class="btn primary" id="openFile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h7l2 2h7v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>
+        Open video
+      </button>
+      <input type="file" id="fileInput" accept="video/*" hidden />
+      <div class="url">
+        <input id="urlInput" type="url" placeholder="…or paste a video URL (.mp4)" inputmode="url" autocomplete="off" />
+      </div>
+      <button class="btn" id="loadUrl">Load URL</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="stage-wrap">
+      <div class="frame" id="frame">
+        <div class="mode-pill" id="modePill" hidden>
+          <button id="watchBtn" class="on"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Watch</button>
+          <button id="drawBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Draw</button>
+        </div>
+        <video id="video" playsinline controls preload="metadata"></video>
+        <canvas id="draw"></canvas>
+        <div class="empty" id="empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>
+          <div class="big">Load a video to begin</div>
+          <div>Open a file from your iPad, or paste a direct video link.</div>
+        </div>
+      </div>
+
+      <div class="toolbar" id="toolbar" hidden>
+        <div class="tgroup">
+          <button class="tool on" id="penTool" title="Pen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7-4-4-7 7-1 5z"/><path d="M16 8l1-1"/></svg></button>
+          <button class="tool" id="hlTool" title="Highlighter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l6 6"/><path d="M4 20l3.5-.5L18 9l-3-3L4.5 16.5z"/></svg></button>
+          <button class="tool" id="eraseTool" title="Eraser"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3l5 5L10 19H5l-2-2z"/><path d="M13 6l5 5"/></svg></button>
+        </div>
+        <div class="tgroup" id="swatches"></div>
+        <div class="tgroup width-ctrl">
+          <span style="color:var(--ink-dim);font-size:12px">Size</span>
+          <input type="range" id="width" min="1" max="22" value="5" />
+        </div>
+        <div class="tgroup">
+          <button class="tool" id="undo" title="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg></button>
+          <button class="tool" id="redo" title="Redo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h4"/></svg></button>
+          <button class="tool" id="clear" title="Clear all"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button>
+        </div>
+        <div class="tgroup">
+          <button class="tool" id="snap" title="Capture annotated frame"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h3l2-2h6l2 2h3v12H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+        </div>
+        <label class="toggle" id="pencilOnly"><span class="sw"></span>Pencil only</label>
+      </div>
+    </div>
+
+    <aside>
+      <div class="tabs">
+        <button id="tabNotes" class="on">Notes</button>
+        <button id="tabSnaps">Snapshots</button>
+      </div>
+
+      <div class="pane" id="paneNotes">
+        <div class="add-note">
+          <div class="row">
+            <span class="ts-chip" id="curTime">00:00</span>
+            <button class="btn ghost" id="grabTime" style="font-size:12px;padding:7px 10px">Use current time</button>
+          </div>
+          <textarea id="noteText" placeholder="Type a note for this moment…"></textarea>
+          <button class="btn primary" id="addNote" style="justify-content:center">+ Add note at <span id="addAt" style="margin-left:4px">00:00</span></button>
+        </div>
+        <div id="noteList"></div>
+        <div class="tip">
+          <b>Tip:</b> Notes save automatically per video on this iPad. Tap a timestamp to jump there. Switch to <b>Draw</b> mode (top-left) to write over a paused frame with your Pencil, then hit the <b>camera</b> to save the marked-up frame.
+        </div>
+      </div>
+
+      <div class="pane" id="paneSnaps" hidden>
+        <div class="snap-grid" id="snapGrid"></div>
+        <div class="empty-list" id="snapEmpty">No snapshots yet.<br>Draw on a frame, then tap the camera icon.</div>
+      </div>
+
+      <div class="pane-foot">
+        <button class="btn ghost" id="exportNotes">Export notes (.txt)</button>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<script>
+(() => {
+  // ---------- elements ----------
+  const $ = id => document.getElementById(id);
+  const video = $('video'), canvas = $('draw'), frame = $('frame');
+  const ctx = canvas.getContext('2d');
+  const toolbar = $('toolbar'), modePill = $('modePill'), empty = $('empty');
+
+  // ---------- safe storage ----------
+  const store = {
+    get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } },
+    set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  };
+
+  // ---------- drawing state ----------
+  const COLORS = ['#ffffff','#FFD23F','#F26522','#FF5252','#5CB85C','#4DB8E8'];
+  let tool='pen', color='#F26522', baseWidth=5;
+  let strokes=[], redoStack=[], current=null;
+  let drawMode=false, pencilOnly=false, drawing=false, penSeen=false;
+  let dpr = Math.max(1, Math.min(window.devicePixelRatio||1, 3));
+
+  // ---------- canvas sizing (normalized coords keep drawings on resize) ----------
+  function fitCanvas(){
+    const r = canvas.getBoundingClientRect();
+    if(!r.width || !r.height) return;
+    canvas.width = Math.round(r.width*dpr);
+    canvas.height = Math.round(r.height*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    redraw();
+  }
+  function cssSize(){ const r=canvas.getBoundingClientRect(); return {w:r.width,h:r.height}; }
+
+  function styleFor(s){
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    if(s.tool==='eraser'){ ctx.globalCompositeOperation='destination-out'; ctx.globalAlpha=1; ctx.strokeStyle='#000'; }
+    else if(s.tool==='highlighter'){ ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=.32; ctx.strokeStyle=s.color; }
+    else { ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1; ctx.strokeStyle=s.color; }
+  }
+  function segWidth(s,p){
+    if(s.tool==='highlighter') return s.width*3.2;
+    if(s.tool==='eraser') return s.width*2.4;
+    return s.width*(0.4 + 1.1*(p||0.5)); // pressure for pen
+  }
+  function drawStroke(s){
+    const {w,h}=cssSize(); if(!s.pts.length) return;
+    styleFor(s);
+    for(let i=1;i<s.pts.length;i++){
+      const a=s.pts[i-1], b=s.pts[i];
+      ctx.lineWidth=segWidth(s,b.p);
+      ctx.beginPath(); ctx.moveTo(a.x*w,a.y*h); ctx.lineTo(b.x*w,b.y*h); ctx.stroke();
+    }
+    if(s.pts.length===1){ // a tap = dot
+      const a=s.pts[0]; ctx.lineWidth=segWidth(s,a.p);
+      ctx.beginPath(); ctx.arc(a.x*w,a.y*h, Math.max(0.6,segWidth(s,a.p)/2),0,7); ctx.fillStyle=ctx.strokeStyle; ctx.globalAlpha = s.tool==='highlighter'?.32:1; if(s.tool!=='eraser'){ctx.fill();}
+    }
+    ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1;
+  }
+  function redraw(){
+    const {w,h}=cssSize();
+    ctx.clearRect(0,0,w,h);
+    strokes.forEach(drawStroke);
+    if(current) drawStroke(current);
+    updateUndo();
+  }
+
+  // ---------- pointer handling ----------
+  function pos(e){
+    const r=canvas.getBoundingClientRect();
+    return { x:(e.clientX-r.left)/r.width, y:(e.clientY-r.top)/r.height, p:(e.pressure>0?e.pressure:0.5) };
+  }
+  function start(e){
+    if(!drawMode) return;
+    if(e.pointerType==='pen') penSeen=true;
+    if(pencilOnly && penSeen && e.pointerType!=='pen') return; // palm rejection
+    e.preventDefault();
+    drawing=true;
+    if(!video.paused) video.pause();
+    current={tool, color, width:baseWidth, pts:[pos(e)]};
+    redoStack=[];
+    try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
+    redraw();
+  }
+  function move(e){
+    if(!drawing) return;
+    if(pencilOnly && penSeen && e.pointerType!=='pen') return;
+    e.preventDefault();
+    // coalesced events => smoother high-rate Pencil lines
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    evs.forEach(ev=> current.pts.push(pos(ev)));
+    redraw();
+  }
+  function end(e){
+    if(!drawing) return;
+    drawing=false;
+    if(current && current.pts.length) strokes.push(current);
+    current=null;
+    redraw();
+  }
+  canvas.addEventListener('pointerdown', start);
+  canvas.addEventListener('pointermove', move);
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
+  canvas.addEventListener('pointerleave', end);
+
+  // ---------- toolbar wiring ----------
+  function setTool(t,el){ tool=t; [['pen',$('penTool')],['highlighter',$('hlTool')],['eraser',$('eraseTool')]].forEach(([n,b])=>b.classList.toggle('on',n===t)); }
+  $('penTool').onclick=()=>setTool('pen');
+  $('hlTool').onclick=()=>setTool('highlighter');
+  $('eraseTool').onclick=()=>setTool('eraser');
+
+  const sw=$('swatches');
+  COLORS.forEach((c,i)=>{
+    const b=document.createElement('button');
+    b.className='swatch'+(c===color?' on':''); b.style.background=c; b.title=c;
+    b.onclick=()=>{ color=c; [...sw.children].forEach(x=>x.classList.remove('on')); b.classList.add('on'); if(tool==='eraser') setTool('pen'); };
+    sw.appendChild(b);
+  });
+  $('width').oninput=e=>baseWidth=+e.target.value;
+
+  function updateUndo(){ $('undo').disabled=!strokes.length; $('redo').disabled=!redoStack.length; }
+  $('undo').onclick=()=>{ if(strokes.length){ redoStack.push(strokes.pop()); redraw(); } };
+  $('redo').onclick=()=>{ if(redoStack.length){ strokes.push(redoStack.pop()); redraw(); } };
+  $('clear').onclick=()=>{ if(strokes.length && confirm('Clear all drawing on this frame?')){ redoStack=[]; strokes=[]; redraw(); } };
+
+  const pencilTgl=$('pencilOnly');
+  pencilTgl.onclick=()=>{ pencilOnly=!pencilOnly; pencilTgl.classList.toggle('on',pencilOnly); };
+
+  // ---------- watch / draw mode ----------
+  function setMode(draw){
+    drawMode=draw;
+    frame.classList.toggle('drawing',draw);
+    $('drawBtn').classList.toggle('on',draw);
+    $('watchBtn').classList.toggle('on',!draw);
+    video.controls=!draw;
+    if(draw && !video.paused) video.pause();
+  }
+  $('drawBtn').onclick=()=>setMode(true);
+  $('watchBtn').onclick=()=>setMode(false);
+
+  // ---------- snapshot ----------
+  function snapshot(){
+    const vw=video.videoWidth, vh=video.videoHeight;
+    if(!vw){ alert('Load a video first.'); return; }
+    const off=document.createElement('canvas'); off.width=vw; off.height=vh;
+    const octx=off.getContext('2d');
+    try{
+      octx.drawImage(video,0,0,vw,vh);
+      octx.drawImage(canvas,0,0,canvas.width,canvas.height,0,0,vw,vh);
+      const data=off.toDataURL('image/png');
+      addSnap(data);
+    }catch(err){
+      alert('Couldn’t capture this frame.\n\nThis happens with some online videos that block frame access (CORS). Local files always work.');
+    }
+  }
+  $('snap').onclick=snapshot;
+
+  // ---------- snapshots tray ----------
+  let snaps=[];
+  function addSnap(data){
+    snaps.unshift({id:Date.now(),data});
+    renderSnaps();
+    setTab('snaps');
+  }
+  function renderSnaps(){
+    const g=$('snapGrid'); g.innerHTML='';
+    $('snapEmpty').style.display = snaps.length?'none':'block';
+    snaps.forEach(s=>{
+      const d=document.createElement('div'); d.className='snap';
+      d.innerHTML=`<img src="${s.data}" alt="snapshot">
+        <button class="x" title="Remove">×</button>
+        <button class="dl">Save</button>`;
+      d.querySelector('.x').onclick=()=>{ snaps=snaps.filter(x=>x.id!==s.id); renderSnaps(); };
+      d.querySelector('.dl').onclick=()=>downloadData(s.data,`acadxl-frame-${s.id}.png`);
+      d.querySelector('img').onclick=()=>downloadData(s.data,`acadxl-frame-${s.id}.png`);
+      g.appendChild(d);
+    });
+  }
+  function downloadData(data,name){
+    const a=document.createElement('a'); a.href=data; a.download=name;
+    document.body.appendChild(a); a.click(); a.remove();
+    // iPad Safari fallback: open so user can long-press → Save Image
+    setTimeout(()=>{ try{ window.open(data,'_blank'); }catch(_){} },150);
+  }
+
+  // ---------- tabs ----------
+  function setTab(t){
+    const n=t==='notes';
+    $('tabNotes').classList.toggle('on',n); $('tabSnaps').classList.toggle('on',!n);
+    $('paneNotes').hidden=!n; $('paneSnaps').hidden=n;
+  }
+  $('tabNotes').onclick=()=>setTab('notes');
+  $('tabSnaps').onclick=()=>setTab('snaps');
+
+  // ---------- timestamp notes ----------
+  let notes=[], srcKey=null, useTime=null;
+  const fmt=s=>{ s=Math.max(0,Math.floor(s||0)); const m=Math.floor(s/60),x=s%60; const h=Math.floor(m/60); const mm=(h?String(m%60).padStart(2,'0'):m); return (h?h+':':'')+String(mm).padStart(2,'0')+':'+String(x).padStart(2,'0'); };
+
+  function notesKey(){ return srcKey ? 'acadxl-notes::'+srcKey : null; }
+  function loadNotes(){ const k=notesKey(); notes = (k && store.get(k)) || []; renderNotes(); }
+  function saveNotes(){ const k=notesKey(); if(k) store.set(k,notes); }
+
+  function renderNotes(){
+    const list=$('noteList'); list.innerHTML='';
+    if(!notes.length){ list.innerHTML='<div class="empty-list">No notes yet.<br>Pause anywhere and add one.</div>'; return; }
+    notes.slice().sort((a,b)=>a.t-b.t).forEach(n=>{
+      const el=document.createElement('div'); el.className='note';
+      el.innerHTML=`<div class="head">
+          <button class="time">${fmt(n.t)}</button>
+          <div class="acts">
+            <button class="edit" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+            <button class="del" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button>
+          </div>
+        </div>
+        <div class="body"></div>`;
+      el.querySelector('.body').textContent=n.text;
+      el.querySelector('.time').onclick=()=>{ video.currentTime=n.t; video.play().catch(()=>{}); };
+      el.querySelector('.del').onclick=()=>{ if(confirm('Delete this note?')){ notes=notes.filter(x=>x.id!==n.id); saveNotes(); renderNotes(); } };
+      el.querySelector('.edit').onclick=()=>{ const v=prompt('Edit note:',n.text); if(v!=null){ n.text=v; saveNotes(); renderNotes(); } };
+      list.appendChild(el);
+    });
+  }
+
+  $('grabTime').onclick=()=>{ useTime=video.currentTime; $('addAt').textContent=fmt(useTime); };
+  video.addEventListener('timeupdate',()=>{ $('curTime').textContent=fmt(video.currentTime); if(useTime==null) $('addAt').textContent=fmt(video.currentTime); });
+
+  $('addNote').onclick=()=>{
+    const t = useTime!=null ? useTime : video.currentTime;
+    const text=$('noteText').value.trim();
+    if(!text){ $('noteText').focus(); return; }
+    notes.push({id:Date.now(), t, text});
+    $('noteText').value=''; useTime=null; $('addAt').textContent=fmt(video.currentTime);
+    saveNotes(); renderNotes();
+  };
+
+  $('exportNotes').onclick=()=>{
+    if(!notes.length){ alert('No notes to export yet.'); return; }
+    const title = srcKey||'video';
+    const lines = notes.slice().sort((a,b)=>a.t-b.t).map(n=>`[${fmt(n.t)}]  ${n.text}`);
+    const blob=new Blob([`AcadXL Video Annotator — Notes\nSource: ${title}\n\n`+lines.join('\n')],{type:'text/plain'});
+    const url=URL.createObjectURL(blob); downloadData(url,'acadxl-notes.txt');
+    setTimeout(()=>URL.revokeObjectURL(url),4000);
+  };
+
+  // ---------- load video ----------
+  function onVideoReady(){
+    empty.style.display='none';
+    modePill.hidden=false; toolbar.hidden=false;
+    if(video.videoWidth){
+      frame.classList.add('has-ratio');
+      frame.style.setProperty('--ar', video.videoWidth+'/'+video.videoHeight);
+    }
+    strokes=[]; redoStack=[]; current=null;
+    requestAnimationFrame(fitCanvas);
+    loadNotes();
+    setMode(false);
+  }
+  video.addEventListener('loadedmetadata', onVideoReady);
+  video.addEventListener('loadeddata', ()=>requestAnimationFrame(fitCanvas));
+
+  $('openFile').onclick=()=>$('fileInput').click();
+  $('fileInput').onchange=e=>{
+    const f=e.target.files[0]; if(!f) return;
+    srcKey='file:'+f.name+':'+f.size;
+    video.src=URL.createObjectURL(f);
+    video.load();
+  };
+  function loadUrl(){
+    const u=$('urlInput').value.trim(); if(!u) return;
+    srcKey='url:'+u;
+    video.removeAttribute('crossorigin'); // keep playback reliable; snapshots may be CORS-limited
+    video.src=u; video.load();
+  }
+  $('loadUrl').onclick=loadUrl;
+  $('urlInput').addEventListener('keydown',e=>{ if(e.key==='Enter') loadUrl(); });
+
+  // ---------- resize ----------
+  let rT; const onResize=()=>{ clearTimeout(rT); rT=setTimeout(()=>{ dpr=Math.max(1,Math.min(window.devicePixelRatio||1,3)); fitCanvas(); },120); };
+  window.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', ()=>setTimeout(onResize,250));
+  if(window.visualViewport) visualViewport.addEventListener('resize', onResize);
+
+  // prevent pinch-zoom / double-tap zoom over the stage while annotating
+  ['gesturestart','gesturechange'].forEach(ev=>frame.addEventListener(ev,e=>e.preventDefault()));
+  document.addEventListener('dblclick',e=>{ if(drawMode) e.preventDefault(); });
+
+  updateUndo();
+})();
+</script>
+</body>
+</html>
